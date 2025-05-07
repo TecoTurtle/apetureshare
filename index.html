@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>apetureShare</title>
+    <script src="https://cdn.jsdelivr.net/npm/webtorrent@latest/webtorrent.min.js"></script>
+    <style>
+  body {
+    background-color: black;
+    color: white;
+    font-family: sans-serif;
+  }
+</style>
+</head>
+<body>
+
+<h2>apertureShare</h2>
+<p>send files the easy way</p>
+
+<!-- Uploader Section -->
+<div id="uploader">
+    <h3>uploader</h3>
+    <input type="file" id="file-to-share" /><br>
+    <button id="upload-button">upload file</button>
+    <p id="upload-info"></p>
+</div>
+
+<!-- Receiver Section -->
+<div id="receiver">
+    <h3>receiver</h3>
+    <input type="text" id="magnet-input" placeholder="enter the magnet link" /><br>
+    <button id="retrieve-button">Retrieve File</button>
+    <p id="receiver-info"></p>
+</div>
+
+<script>
+    const client = new WebTorrent();
+
+    // upload file as a torrent
+    document.getElementById('upload-button').addEventListener('click', () => {
+        const fileInput = document.getElementById('file-to-share');
+        const file = fileInput.files[0];
+        if (!file) {
+            alert("Please select a file to upload.");
+            return;
+        }
+
+        // show a basic message indicating the file is being uploaded
+        document.getElementById('upload-info').innerHTML = "Uploading file...";
+
+        // list of Webtorrent trackers
+        const trackers were using = [
+            'wss://tracker.openwebtorrent.com',
+            'wss://tracker.fastcast.nz',
+            'wss://tracker.zeromq.xyz',
+            'wss://tracker.webtorrent.io',
+            'wss://tracker.leechers-paradise.org',
+        ];
+
+        // create a torrent from the file
+        client.seed(file, { name: file.name, announce: trackers }, (torrent) => {
+            console.log('File is being shared via WebTorrent:', torrent);
+            window.sharedTorrent = torrent; // Save the torrent for later
+
+            // get the magnet link
+            const magnetLink = torrent.magnetURI;
+
+            // show the magnet link to the uploader for sharing
+            document.getElementById('upload-info').innerHTML = `
+                file uploaded successfully!<br>
+                share this magnet link: <a href="${magnetLink}" target="_blank">${magnetLink}</a>
+            `;
+        });
+    });
+
+    // retrieve the file from a magnet link
+    document.getElementById('retrieve-button').addEventListener('click', () => {
+        const magnetLink = document.getElementById('magnet-input').value;
+        if (!magnetLink) {
+            alert("please enter a valid magnet link");
+            return;
+        }
+
+        // log the magnet link to make sure we have it
+        console.log('Magnet link entered:', magnetLink);
+
+        client.add(magnetLink, { announce: [
+            'wss://tracker.openwebtorrent.com',
+            'wss://tracker.fastcast.nz',
+            'wss://tracker.zeromq.xyz',
+            'wss://tracker.webtorrent.io',
+            'wss://tracker.leechers-paradise.org'
+        ]}, (torrent) => {
+            console.log('Torrent added:', torrent);
+
+            // listen for when the download is finished
+            torrent.on('done', () => {
+                console.log('download completed');
+                
+                // check if there are files in the torrent
+                if (torrent.files.length === 0) {
+                    console.log('no files in the torrent');
+                    alert('no files found in the torrent');
+                    return;
+                }
+
+                // assume were downloading only one file for simplicity
+                const file = torrent.files[0];
+                
+                console.log('file details:', file);
+
+                // get the files content as a blob
+                file.getBlob((err, blob) => {
+                    if (err) {
+                        console.error('error getting the blob:', err);
+                        alert('error retrieving file');
+                        return;
+                    }
+
+                    // create a download link and trigger the file download
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = URL.createObjectURL(blob);
+
+                    // set the download filename (this will preserve the file's original name because webtorrent changes the name for some reason)
+                    downloadLink.download = file.name;
+
+                    // trigger the download
+                    downloadLink.click(); // Trigger the download
+                });
+            });
+
+            // add an error handler in case WebTorrent encounters issues
+            torrent.on('error', (err) => {
+                console.error('error with torrent:', err);
+                alert('there was an issue retrieving the file please check the magnet link and try again.');
+            });
+        });
+    });
+</script>
+
+</body>
+</html>
