@@ -52,7 +52,7 @@
   <script>
     // check if pako is loaded
     if (typeof pako === 'undefined') {
-      alert('Pako library failed to load. Compression will not work.');
+      alert('pako library failed to load compression will not work');
     }
 
     const client = new WebTorrent();
@@ -102,9 +102,9 @@
           console.log('compressed size (before base64):', compressed.length);
           console.log('final shareID:', shareID);
         } catch (error) {
-          console.error('Compression error:', error);
-          alert("Error compressing shareID: " + error.message);
-          document.getElementById('upload-info').innerHTML = "Failed to generate shareID.";
+          console.error('compression error:', error);
+          alert("error compressing shareID: " + error.message);
+          document.getElementById('upload-info').innerHTML = "failed to generate shareID.";
           return;
         }
 
@@ -129,28 +129,28 @@
       });
     });
 
-    // Retrieve file from base64-encoded, DEFLATE-compressed magnet link (shareID)
+    // retrieve file from base64 encoded, DEFLATE compressed magnet link (shareID)
     document.getElementById('retrieve-button').addEventListener('click', () => {
       const shareID = document.getElementById('magnet-input').value;
       let magnetLink;
 
       try {
-        // Decode Base64
+        // decode Base64
         const binaryString = base64ToBinary(shareID);
-        // Convert string to Uint8Array for decompression
+        // convert string to Uint8Array for decompression
         const compressed = new Uint8Array(binaryString.split('').map(char => char.charCodeAt(0)));
-        // Decompress DEFLATE
+        // decompress DEFLATE
         magnetLink = pako.inflate(compressed, { to: 'string' });
-        // Debug: Log decoded magnet link
-        console.log('Decoded magnet link:', magnetLink);
+        // debug: Log decoded magnet link
+        console.log('decoded magnet link:', magnetLink);
       } catch (error) {
-        console.error('Decompression error:', error);
-        alert("Invalid shareID: " + error.message);
+        console.error('decompression error:', error);
+        alert("invalid shareID: " + error.message);
         return;
       }
 
       if (!magnetLink.startsWith("magnet:?")) {
-        alert("Decoded shareID is not a valid magnet link");
+        alert("decoded shareID is not a valid magnet link");
         return;
       }
 
