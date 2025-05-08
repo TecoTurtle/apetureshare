@@ -11,6 +11,18 @@
       color: white;
       font-family: sans-serif;
     }
+    button {
+      margin-top: 10px;
+      padding: 5px 10px;
+      font-size: 1em;
+    }
+    #share-id {
+      word-break: break-all;
+      color: lightgreen;
+    }
+    #copy-status {
+      color: gold;
+    }
   </style>
 </head>
 <body>
@@ -20,17 +32,17 @@
 
   <!-- Uploader Section -->
   <div id="uploader">
-    <h3>uploader</h3>
+    <h3>Uploader</h3>
     <input type="file" id="file-to-share" /><br>
-    <button id="upload-button">upload file</button>
+    <button id="upload-button">upload File</button>
     <p id="upload-info"></p>
   </div>
 
   <!-- Receiver Section -->
   <div id="receiver">
     <h3>receiver</h3>
-    <input type="text" id="magnet-input" placeholder="enter the magnet link" /><br>
-    <button id="retrieve-button">Retrieve File</button>
+    <input type="text" id="magnet-input" placeholder="Enter ShareID" /><br>
+    <button id="retrieve-button">retrieve File</button>
     <p id="receiver-info"></p>
   </div>
 
@@ -44,57 +56,69 @@
       'wss://tracker.webtorrent.io'
     ];
 
-    // upload file as a torrent
+    // upload file as a torrent and show shareID
     document.getElementById('upload-button').addEventListener('click', () => {
       const fileInput = document.getElementById('file-to-share');
       const file = fileInput.files[0];
       if (!file) {
-        alert("Please select a file to upload.");
+        alert("please select a file to upload.");
         return;
       }
 
-      document.getElementById('upload-info').innerHTML = "Uploading file...";
+      document.getElementById('upload-info').innerHTML = "uploading file...";
 
       client.seed(file, { name: file.name, announce: trackers }, (torrent) => {
-        console.log('File is being shared via WebTorrent:', torrent);
-        window.sharedTorrent = torrent;
-
         const magnetLink = torrent.magnetURI;
+        const shareID = btoa(magnetLink); // base64 encode magnet link
+
         document.getElementById('upload-info').innerHTML = `
           file uploaded successfully!<br>
-          share this magnet link: <a href="${magnetLink}" target="_blank">${magnetLink}</a>
+          <strong>shareID:</strong> <span id="share-id">${shareID}</span><br>
+          <button id="copy-button">copy shareID</button>
+          <span id="copy-status" style="margin-left: 10px;"></span>
         `;
+
+        // add the event listener AFTER the button exists in the DOM
+        document.getElementById('copy-button').addEventListener('click', () => {
+          navigator.clipboard.writeText(shareID).then(() => {
+            document.getElementById("copy-status").innerText = "copied!";
+            setTimeout(() => {
+              document.getElementById("copy-status").innerText = "";
+            }, 1500);
+          }).catch(err => {
+            alert("clipboard error: " + err);
+          });
+        });
       });
     });
 
-    // retrieve the file from a magnet link
+    // retrieve file from base64-encoded magnet link (shareID) yes shareIDs are fancy magnet links
     document.getElementById('retrieve-button').addEventListener('click', () => {
-      const magnetLink = document.getElementById('magnet-input').value;
-      if (!magnetLink) {
-        alert("please enter a valid magnet link");
+      const shareID = document.getElementById('magnet-input').value;
+      let magnetLink;
+
+      try {
+        magnetLink = atob(shareID); // decode base64
+      } catch (e) {
+        alert("invalid shareID");
         return;
       }
 
-      console.log('Magnet link entered:', magnetLink);
+      if (!magnetLink.startsWith("magnet:?")) {
+        alert("decoded shareID is not valid");
+        return;
+      }
 
       client.add(magnetLink, { announce: trackers }, (torrent) => {
-        console.log('Torrent added:', torrent);
-
         torrent.on('done', () => {
-          console.log('download completed');
-
           if (torrent.files.length === 0) {
-            console.log('no files in the torrent');
             alert('no files found in the torrent');
             return;
           }
 
           const file = torrent.files[0];
-          console.log('file details:', file);
-
           file.getBlob((err, blob) => {
             if (err) {
-              console.error('error getting the blob:', err);
               alert('error retrieving file');
               return;
             }
@@ -107,12 +131,12 @@
         });
 
         torrent.on('error', (err) => {
-          console.error('error with torrent:', err);
-          alert('there was an issue retrieving the file please check the magnet link and try again.');
+          alert('error retrieving file check the shareID and try again.');
         });
       });
     });
   </script>
-
+<a href="https://www.youtube.com/@TecoTurtle">my youtube</a>
+<a href="https://github.com/webtorrent/webtorrent"> this project is powered by webtorrent </a>
 </body>
 </html>
