@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>apetureShare</title>
   <script src="https://cdn.jsdelivr.net/npm/webtorrent@latest/webtorrent.min.js"></script>
+  <!-- pako library for DEFLATE compression -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
   <style>
     body {
       background-color: black;
@@ -29,6 +31,7 @@
 
   <h2>apertureShare</h2>
   <p>send files the easy way</p>
+  <p>now uses shareIDV2</p>
 
   <!-- Uploader Section -->
   <div id="uploader">
@@ -47,6 +50,11 @@
   </div>
 
   <script>
+    // check if pako is loaded
+    if (typeof pako === 'undefined') {
+      alert('Pako library failed to load. Compression will not work.');
+    }
+
     const client = new WebTorrent();
 
     const trackers = [
@@ -55,6 +63,16 @@
       'wss://tracker.zeromq.xyz',
       'wss://tracker.webtorrent.io'
     ];
+
+    // helper function to convert binary string to base64
+    function binaryToBase64(binary) {
+      return btoa(binary);
+    }
+
+    // helper function to convert base64 to binary string
+    function base64ToBinary(base64) {
+      return atob(base64);
+    }
 
     // upload file as a torrent and show shareID
     document.getElementById('upload-button').addEventListener('click', () => {
@@ -69,7 +87,26 @@
 
       client.seed(file, { name: file.name, announce: trackers }, (torrent) => {
         const magnetLink = torrent.magnetURI;
-        const shareID = btoa(magnetLink); // base64 encode magnet link
+        let shareID;
+
+        try {
+          // compress magnet link with DEFLATE
+          const compressed = pako.deflate(magnetLink); // returns Uint8Array
+          // convert compressed binary to string for base64
+          const binaryString = String.fromCharCode.apply(null, compressed);
+          // base64 encode the compressed data
+          shareID = binaryToBase64(binaryString);
+          // debug: Log sizes to confirm compression
+          console.log('original magnet link:', magnetLink);
+          console.log('original size:', magnetLink.length);
+          console.log('compressed size (before base64):', compressed.length);
+          console.log('final shareID:', shareID);
+        } catch (error) {
+          console.error('Compression error:', error);
+          alert("Error compressing shareID: " + error.message);
+          document.getElementById('upload-info').innerHTML = "Failed to generate shareID.";
+          return;
+        }
 
         document.getElementById('upload-info').innerHTML = `
           file uploaded successfully!<br>
@@ -78,7 +115,7 @@
           <span id="copy-status" style="margin-left: 10px;"></span>
         `;
 
-        // add the event listener AFTER the button exists in the DOM
+        // Add the event listener AFTER the button exists in the DOM
         document.getElementById('copy-button').addEventListener('click', () => {
           navigator.clipboard.writeText(shareID).then(() => {
             document.getElementById("copy-status").innerText = "copied!";
@@ -92,20 +129,28 @@
       });
     });
 
-    // retrieve file from base64-encoded magnet link (shareID) yes shareIDs are fancy magnet links
+    // Retrieve file from base64-encoded, DEFLATE-compressed magnet link (shareID)
     document.getElementById('retrieve-button').addEventListener('click', () => {
       const shareID = document.getElementById('magnet-input').value;
       let magnetLink;
 
       try {
-        magnetLink = atob(shareID); // decode base64
-      } catch (e) {
-        alert("invalid shareID");
+        // Decode Base64
+        const binaryString = base64ToBinary(shareID);
+        // Convert string to Uint8Array for decompression
+        const compressed = new Uint8Array(binaryString.split('').map(char => char.charCodeAt(0)));
+        // Decompress DEFLATE
+        magnetLink = pako.inflate(compressed, { to: 'string' });
+        // Debug: Log decoded magnet link
+        console.log('Decoded magnet link:', magnetLink);
+      } catch (error) {
+        console.error('Decompression error:', error);
+        alert("Invalid shareID: " + error.message);
         return;
       }
 
       if (!magnetLink.startsWith("magnet:?")) {
-        alert("decoded shareID is not valid");
+        alert("Decoded shareID is not a valid magnet link");
         return;
       }
 
@@ -136,7 +181,7 @@
       });
     });
   </script>
-<a href="https://www.youtube.com/@TecoTurtle">my youtube</a><br>
-<a href="https://github.com/webtorrent/webtorrent"> this project is powered by webtorrent </a>
+  <a href="https://www.youtube.com/@TecoTurtle">my youtube</a><br>
+  <a href="https://github.com/webtorrent/webtorrent"> this project is powered by webtorrent </a>
 </body>
 </html>
